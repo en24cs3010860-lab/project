@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { Theatre } from '../models/Theatre.js';
+import { Screen } from '../models/Screen.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AppError } from '../utils/AppError.js';
+const router=Router();
+router.get('/',asyncHandler(async(req,res)=>{const page=Math.max(1,Number(req.query.page)||1),limit=Math.min(50,Math.max(1,Number(req.query.limit)||10));const filter={isActive:true};if(req.query.city)filter.city=String(req.query.city).slice(0,80);const [data,total]=await Promise.all([Theatre.find(filter).sort({name:1}).skip((page-1)*limit).limit(limit).lean(),Theatre.countDocuments(filter)]);res.json({success:true,data,pagination:{page,limit,total,totalPages:Math.ceil(total/limit)}});}));
+router.get('/:theatreId/screens',asyncHandler(async(req,res)=>res.json({success:true,data:await Screen.find({theatreId:req.params.theatreId,isActive:true}).lean()})));
+router.post('/',requireAdmin,asyncHandler(async(req,res)=>{const theatre=await Theatre.create(req.body);res.status(201).json({success:true,data:theatre});}));
+router.patch('/:theatreId',requireAdmin,asyncHandler(async(req,res)=>{const theatre=await Theatre.findByIdAndUpdate(req.params.theatreId,{$set:req.body},{new:true,runValidators:true});if(!theatre)throw new AppError(404,'Theatre not found','NOT_FOUND');res.json({success:true,data:theatre});}));
+export default router;

@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { authenticateUser } from '../middleware/auth.js';
+import { Reservation } from '../models/Reservation.js';
+import { SeatInventory } from '../models/SeatInventory.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AppError } from '../utils/AppError.js';
+const router=Router();router.use(authenticateUser);
+router.get('/:reservationId',asyncHandler(async(req,res)=>{const r=await Reservation.findOne({_id:req.params.reservationId,userId:req.user._id}).lean();if(!r)throw new AppError(404,'Reservation not found','NOT_FOUND');res.json({success:true,data:r});}));
+router.delete('/:reservationId',asyncHandler(async(req,res)=>{const r=await Reservation.findOneAndUpdate({_id:req.params.reservationId,userId:req.user._id,status:'ACTIVE'},{$set:{status:'CANCELLED'}},{new:true});if(!r)throw new AppError(404,'Active reservation not found','NOT_FOUND');await SeatInventory.updateMany({showId:r.showId,reservationId:r._id,status:'RESERVED'},{$set:{status:'AVAILABLE',reservationId:null,reservationExpiresAt:null}});req.app.get('io')?.to(`show:${r.showId}`).emit('seatAvailabilityUpdated',{showId:r.showId,seatNumbers:r.seatNumbers,status:'AVAILABLE'});res.json({success:true,message:'Reservation released',data:r});}));
+export default router;

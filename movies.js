@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { Movie } from '../models/Movie.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AppError } from '../utils/AppError.js';
+const router=Router();
+router.get('/',asyncHandler(async(req,res)=>{const page=Math.max(1,Number(req.query.page)||1),limit=Math.min(48,Math.max(1,Number(req.query.limit)||12));const filter={};if(req.query.status)filter.status=req.query.status;if(req.query.genre)filter.genres=req.query.genre;if(req.query.language)filter.languages=req.query.language;if(req.query.search)filter.$text={$search:String(req.query.search).slice(0,100)};const sort=req.query.sort==='rating'?{rating:-1}:req.query.sort==='releaseDate'?{releaseDate:-1}:req.query.sort==='title'?{title:1}:{featured:-1,releaseDate:-1};const [data,total]=await Promise.all([Movie.find(filter).sort(sort).skip((page-1)*limit).limit(limit).lean(),Movie.countDocuments(filter)]);res.json({success:true,data,pagination:{page,limit,total,totalPages:Math.ceil(total/limit)}});}));
+router.get('/featured',asyncHandler(async(_req,res)=>res.json({success:true,data:await Movie.find({featured:true,status:'NOW_SHOWING'}).limit(8).lean()})));
+router.get('/:movieId',asyncHandler(async(req,res)=>{if(!/^[a-f\d]{24}$/i.test(req.params.movieId))throw new AppError(400,'Invalid movie ID','INVALID_ID');const movie=await Movie.findById(req.params.movieId).lean();if(!movie)throw new AppError(404,'Movie not found','NOT_FOUND');res.json({success:true,data:movie});}));
+router.post('/',requireAdmin,asyncHandler(async(req,res)=>{const schema=z.object({title:z.string().min(1).max(160),slug:z.string().min(1).max(180),description:z.string().min(1).max(5000),durationMinutes:z.number().int().positive(),releaseDate:z.coerce.date(),genres:z.array(z.string()).default([]),languages:z.array(z.string()).default([]),status:z.enum(['COMING_SOON','NOW_SHOWING','ARCHIVED']).default('COMING_SOON'),posterUrl:z.string().url().or(z.literal('')).optional(),backdropUrl:z.string().url().or(z.literal('')).optional(),featured:z.boolean().default(false)});const movie=await Movie.create(schema.parse(req.body));res.status(201).json({success:true,data:movie});}));
+router.patch('/:movieId',requireAdmin,asyncHandler(async(req,res)=>{const movie=await Movie.findByIdAndUpdate(req.params.movieId,{$set:req.body},{new:true,runValidators:true,strict:'throw'});if(!movie)throw new AppError(404,'Movie not found','NOT_FOUND');res.json({success:true,data:movie});}));
+router.delete('/:movieId',requireAdmin,asyncHandler(async(req,res)=>{const movie=await Movie.findByIdAndUpdate(req.params.movieId,{status:'ARCHIVED'},{new:true});if(!movie)throw new AppError(404,'Movie not found','NOT_FOUND');res.json({success:true,message:'Movie archived',data:movie});}));
+export default router;

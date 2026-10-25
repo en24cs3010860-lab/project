@@ -1,0 +1,4 @@
+import mongoose from 'mongoose';
+const seatInventorySchema = new mongoose.Schema({showId:{type:mongoose.Schema.Types.ObjectId,ref:'Show',required:true},screenId:{type:mongoose.Schema.Types.ObjectId,ref:'Screen',required:true},seatNumber:{type:String,required:true},row:{type:String,required:true},category:{type:String,enum:['STANDARD','PREMIUM','ACCESSIBLE'],required:true},price:{type:Number,required:true,min:0},status:{type:String,enum:['AVAILABLE','RESERVED','BOOKED'],default:'AVAILABLE'},reservationId:{type:mongoose.Schema.Types.ObjectId,default:null},reservationExpiresAt:{type:Date,default:null},bookingId:{type:mongoose.Schema.Types.ObjectId,default:null}},{timestamps:true});
+seatInventorySchema.index({showId:1,seatNumber:1},{unique:true}); seatInventorySchema.index({showId:1,status:1});
+export const SeatInventory = mongoose.model('SeatInventory',seatInventorySchema);

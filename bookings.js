@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { authenticateUser } from '../middleware/auth.js';
+import { Booking } from '../models/Booking.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { AppError } from '../utils/AppError.js';
+const router=Router();
+router.use(authenticateUser);
+router.get('/my-bookings',asyncHandler(async(req,res)=>{const data=await Booking.find({userId:req.user._id}).sort({createdAt:-1}).limit(100).populate('movieId','title posterUrl').populate('theatreId','name address city').populate('showId','startTime endTime').lean();res.json({success:true,data});}));
+router.get('/:bookingId',asyncHandler(async(req,res)=>{const booking=await Booking.findOne({_id:req.params.bookingId,userId:req.user._id}).populate('movieId','title posterUrl').populate('theatreId','name address city').populate('showId','startTime endTime').lean();if(!booking)throw new AppError(404,'Booking not found','NOT_FOUND');res.json({success:true,data:booking});}));
+export default router;
